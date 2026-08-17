@@ -1,0 +1,26 @@
+services:
+  signal-api:
+    image: bbernhard/signal-cli-rest-api
+    restart: always
+    environment:
+      - MODE=native
+    ports:
+      # Bound to localhost only — signal-cli-rest-api has no built-in auth,
+      # so anyone reaching this port could send from your linked Signal
+      # number. Use an SSH tunnel to reach the QR-link page, don't expose
+      # this publicly.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data/signal-cli:/home/.local/share/signal-cli
+
+  poller:
+    build: .
+    restart: always
+    env_file: .env
+    environment:
+      - SIGNAL_REST_API_URL=http://signal-api:8080
+      - DB_PATH=/data/plane_alert.db
+    volumes:
+      - ./data/plane-alert:/data
+    depends_on:
+      - signal-api

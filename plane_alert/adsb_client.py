@@ -4,10 +4,11 @@ from dataclasses import dataclass
 import requests
 
 from .config import Config
+from .geo import haversine_miles
 
-EARTH_RADIUS_MILES = 3958.8
 MILES_TO_NM = 0.868976
 MILITARY_DB_FLAG = 1
+ROTORCRAFT_CATEGORY = "A7"
 
 
 @dataclass
@@ -21,15 +22,9 @@ class Aircraft:
     altitude_ft: float | None
     ground_speed_kt: float | None
     is_military: bool
+    is_helicopter: bool
+    emergency: str
     distance_miles: float
-
-
-def _haversine_miles(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
-    return 2 * EARTH_RADIUS_MILES * math.asin(math.sqrt(a))
 
 
 def fetch_nearby_aircraft(config: Config) -> list[Aircraft]:
@@ -54,7 +49,7 @@ def fetch_nearby_aircraft(config: Config) -> list[Aircraft]:
         lat, lon = ac.get("lat"), ac.get("lon")
         if lat is None or lon is None:
             continue
-        distance = _haversine_miles(config.home_lat, config.home_lon, lat, lon)
+        distance = haversine_miles(config.home_lat, config.home_lon, lat, lon)
         if distance > config.radius_miles:
             continue
         db_flags = ac.get("dbFlags", 0) or 0
@@ -69,6 +64,8 @@ def fetch_nearby_aircraft(config: Config) -> list[Aircraft]:
                 altitude_ft=ac.get("alt_baro"),
                 ground_speed_kt=ac.get("gs"),
                 is_military=bool(db_flags & MILITARY_DB_FLAG),
+                is_helicopter=ac.get("category") == ROTORCRAFT_CATEGORY,
+                emergency=ac.get("emergency") or "none",
                 distance_miles=distance,
             )
         )
